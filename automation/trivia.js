@@ -35,10 +35,10 @@ export async function generateTrivia(term) {
     try {
         const completion = await openai.chat.completions.create({
             messages: [
-                { role: "system", content: "你是一個幽默風趣的維基百科冷知識專家，請針對給定的詞彙，提供一個簡短（100字以內）、有趣、且不為人知的冷知識。重要規則：1. 必須使用『正體中文（台灣繁體）』。2. 絕對『禁止』使用簡體字。3. 絕對『禁止』使用任何表情符號 (Emoji)。" },
-                { role: "user", content: `請介紹關於「${term}」的冷知識。` }
+                { role: "system", content: "你是一個專業且幽默的維基百科冷知識專家。請針對給定的詞彙，提供一個簡短（100字以內）、有趣、且確實存在、有據可查的冷知識。重要規則：1. 必須基於事實，嚴禁虛構或幻想。2. 必須使用『正體中文（台灣繁體）』。3. 絕對『禁止』使用簡體字。4. 絕對『禁止』使用任何表情符號 (Emoji)。" },
+                { role: "user", content: `請介紹關於「${term}」的真正冷知識，字數要在 100 字內：` }
             ],
-            model: "gpt-4o",
+            model: "gpt-4o-mini",
         });
 
         const content = completion.choices[0].message.content;

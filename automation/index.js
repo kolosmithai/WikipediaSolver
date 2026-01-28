@@ -221,7 +221,8 @@ ${result.path.join(' → ')}
 今日冷知識：【${triviaTerm}】
 ${triviaContent}
 
-#WikiGame #每日挑戰 #冷知識
+ 
+ #WikiGame #每日挑戰 #冷知識
 `;
 
         console.log('\n==========================================');
