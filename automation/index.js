@@ -64,6 +64,37 @@ async function getDailyChallenge() {
 }
 
 async function main() {
+    const args = process.argv.slice(2);
+    const onlyPost = args.includes('--only-post');
+
+    // Special Case: Only Post (Read from existing metadata)
+    if (onlyPost) {
+        console.log('\n[Phase] Only Post mode. Loading metadata...');
+        const todayStr = new Date().toLocaleDateString('en-CA');
+        const metaPath = path.join(OUTPUT_DIR_BASE, todayStr, 'metadata.json');
+
+        if (!fs.existsSync(metaPath)) {
+            console.error('找不到 metadata.json，無法單獨執行發文方案。');
+            process.exit(1);
+        }
+
+        const data = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+        console.log(`已載入解題結果：${data.path.join(' → ')}`);
+
+        try {
+            const now = new Date();
+            const tomorrow08 = new Date(now);
+            tomorrow08.setDate(tomorrow08.getDate() + 1);
+            tomorrow08.setHours(8, 0, 0, 0);
+
+            await scheduleThreadsPost(app, data.imagePaths, data.postContent, tomorrow08);
+            console.log('✅ 發文指令已發送完成！');
+        } catch (e) {
+            console.error('發文失敗:', e.message);
+        }
+        process.exit(0);
+    }
+
     const solver = new PathSolver();
 
     console.log('==========================================');
@@ -189,6 +220,15 @@ ${triviaContent}
         fs.writeFileSync(path.join(OUTPUT_DIR, 'post_content.txt'), finalOutput);
         console.log('檔案已儲存至 ' + OUTPUT_DIR);
 
+        // --- PREPARE METADATA ---
+        const metadata = {
+            path: result.path,
+            imagePaths: imagePaths,
+            postContent: finalOutput,
+            triviaTerm: triviaTerm
+        };
+        fs.writeFileSync(path.join(OUTPUT_DIR, 'metadata.json'), JSON.stringify(metadata, null, 2));
+
         // --- PHASED EXECUTION ---
         const args = process.argv.slice(2);
         const onlyImages = args.includes('--only-images');
@@ -196,7 +236,7 @@ ${triviaContent}
 
         if (onlyImages) {
             console.log('\n[Phase] Only Images mode. Skipping Threads API call.');
-            console.log('✅ Success! Images generated and ready for GitHub hosting.');
+            console.log('✅ Success! Images and Metadata generated.');
             process.exit(0);
         }
 
@@ -204,12 +244,11 @@ ${triviaContent}
         try {
             // Calculate Schedule Time: Tomorrow 08:00
             const now = new Date();
-            const tomorrow = new Date(now);
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            tomorrow.setHours(8, 0, 0, 0); // 08:00:00
+            const tomorrow08 = new Date(now);
+            tomorrow08.setDate(tomorrow08.getDate() + 1);
+            tomorrow08.setHours(8, 0, 0, 0);
 
-            // If we are in 'onlyPost' mode (or default), we call the API
-            await scheduleThreadsPost(app, imagePaths, finalOutput, tomorrow);
+            await scheduleThreadsPost(app, imagePaths, finalOutput, tomorrow08);
 
         } catch (e) {
             console.error('\n⚠️ Threads Scheduling Failed:', e.message);

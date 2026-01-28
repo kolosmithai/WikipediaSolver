@@ -70,4 +70,4 @@ jobs:
           # Wait 10 seconds for GitHub Raw CDN to catch up (optional but safer)
           sleep 10
           cd automation
-          node index.js
+          node index.js --only-post

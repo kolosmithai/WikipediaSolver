@@ -3,6 +3,10 @@ import path from 'path';
 import fetch from 'node-fetch';
 import 'dotenv/config';
 
+// Threads API Config
+const THREADS_USER_ID = process.env.THREADS_USER_ID;
+const THREADS_ACCESS_TOKEN = process.env.THREADS_ACCESS_TOKEN;
+
 // 1. GitHub URL Helper (Replaces Firebase Storage)
 export async function getGitHubImageUrl(localPath) {
     // localPath example: './automation/output/2026-01-28/step_1.png'
