@@ -1,0 +1,13 @@
+
+# Dependencies
+node_modules/
+dist/
+.env
+
+# Automation Output
+automation/output/
+automation/history.json
+
+# OS files
+.DS_Store
+Thumbs.db

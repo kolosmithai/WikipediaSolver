@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>維基百科高分路徑解題器</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="icon" href="favicon.ico">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --font-tc: 'Noto Sans TC', var(--font-sans);
+        }
+
+        body {
+            background-color: var(--color-bg);
+            color: var(--color-text-main);
+            font-family: var(--font-tc);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            /* Prevent body scroll in split view */
+        }
+
+        /* 
+           Layout Transition Logic 
+           Default: Centered single card
+           Split: Two columns with FIXED HEIGHT for scrolling
+        */
+        .solver-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            /* Center vertically initially */
+            justify-content: center;
+            padding: 40px;
+            width: 100%;
+            max-width: 1300px;
+            margin: 0 auto;
+            transition: all 0.5s ease;
+            box-sizing: border-box;
+            height: 100vh;
+            /* Full height initially */
+        }
+
+        /* When split, we lock the height to allow internal scrolling */
+        .solver-container.split-view {
+            align-items: stretch;
+            height: calc(100vh - 40px);
+            /* Fill screen minus padding */
+            padding: 20px;
+            gap: 24px;
+        }
+
+        /* Left/Main Card */
+        .solver-card {
+            background: var(--color-surface);
+            width: 100%;
+            max-width: 600px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--color-divider);
+            padding: 48px;
+            position: relative;
+            transition: all 0.5s ease;
+            display: flex;
+            flex-direction: column;
+            /* Allow scroll if input form is too tall on small screens */
+            max-height: 100%;
+            overflow-y: auto;
+        }
+
+        .solver-container.split-view .solver-card {
+            max-width: 450px;
+            /* Narrower input column */
+            flex: 0 0 450px;
+            padding: 32px;
+        }
+
+        /* Right/Result Card (Hidden initially) */
+        .result-panel {
+            flex: 1;
+            background: var(--color-surface);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--color-divider);
+            padding: 32px;
+            display: none;
+            opacity: 0;
+            transform: translateX(20px);
+            transition: all 0.5s ease;
+
+            /* Flex layout for internal scrolling */
+            flex-direction: column;
+            max-height: 100%;
+            overflow: hidden;
+        }
+
+        .solver-container.split-view .result-panel {
+            display: flex;
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        /* Header */
+        .solver-header {
+            text-align: center;
+            margin-bottom: 32px;
+            flex-shrink: 0;
+        }
+
+        .solver-title {
+            font-family: var(--font-serif);
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--color-text-main);
+            margin-bottom: 8px;
+        }
+
+        .solver-subtitle {
+            font-size: 0.9rem;
+            color: var(--color-text-sub);
+            font-weight: 500;
+        }
+
+        /* Logout Button */
+        .btn-logout-corner {
+            position: absolute;
+            top: 24px;
+            right: 24px;
+            background: transparent;
+            border: 1px solid var(--color-divider);
+            color: var(--color-text-sub);
+            padding: 8px 16px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-logout-corner:hover {
+            border-color: var(--color-timer);
+            color: var(--color-timer);
+            background: rgba(204, 68, 75, 0.05);
+        }
+
+        /* Inputs */
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+            margin-bottom: 24px;
+            flex-shrink: 0;
+        }
+
+        .input-label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--color-text-sub);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 14px;
+            background: var(--color-bg);
+            border: 1px solid var(--color-divider);
+            border-radius: var(--radius-sm);
+            font-size: 1rem;
+            color: var(--color-text-main);
+            font-family: var(--font-tc);
+            transition: all 0.2s;
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: var(--color-accent);
+            box-shadow: 0 0 0 4px rgba(207, 167, 110, 0.1);
+        }
+
+        /* Actions */
+        .quick-actions {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            flex-shrink: 0;
+        }
+
+        .btn-quick {
+            background: rgba(0, 0, 0, 0.03);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 99px;
+            font-size: 0.9rem;
+            color: var(--color-text-sub);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+            font-family: var(--font-tc);
+        }
+
+        .btn-quick:hover {
+            background: var(--color-accent);
+            color: white;
+        }
+
+        .btn-solve {
+            width: 100%;
+            padding: 16px;
+            background: var(--color-text-main);
+            color: var(--color-bg);
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, opacity 0.2s;
+            font-family: var(--font-tc);
+            flex-shrink: 0;
+        }
+
+        .btn-solve:hover {
+            transform: translateY(-2px);
+            opacity: 0.95;
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn-solve:disabled {
+            opacity: 0.5;
+            cursor: wait;
+        }
+
+        /* Results Panel Content */
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 24px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--color-divider);
+            flex-shrink: 0;
+        }
+
+        .result-title {
+            font-family: var(--font-serif);
+            font-size: 1.8rem;
+            color: var(--color-accent);
+            font-weight: bold;
+        }
+
+        /* SCROLLABLE PATH LIST */
+        .path-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            flex: 1;
+            /* Grow to fill space */
+            overflow-y: auto;
+            /* Internal Scroll */
+            padding-right: 8px;
+            margin-bottom: 24px;
+            min-height: 0;
+            /* Critical for flex scrolling */
+        }
+
+        .path-item {
+            display: flex;
+            align-items: center;
+            background: var(--color-bg);
+            padding: 16px 20px;
+            border-radius: 12px;
+            border: 1px solid var(--color-divider);
+            flex-shrink: 0;
+        }
+
+        .path-index {
+            font-family: var(--font-serif);
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: var(--color-accent);
+            width: 40px;
+        }
+
+        .path-content {
+            flex: 1;
+            font-weight: 500;
+        }
+
+        .path-tag {
+            font-size: 0.75rem;
+            padding: 4px 10px;
+            border-radius: 99px;
+            background: rgba(44, 44, 42, 0.05);
+            color: var(--color-text-sub);
+            font-weight: 600;
+        }
+
+        .share-block {
+            background: #1e1e1e;
+            /* Dark code block */
+            color: #E6E1D6;
+            padding: 24px;
+            border-radius: 12px;
+            position: relative;
+            font-family: monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            flex-shrink: 0;
+        }
+
+        /* Progress Bar (in Solver Card) */
+        .progress-wrapper {
+            margin-top: 24px;
+            display: none;
+            flex-shrink: 0;
+        }
+
+        .progress-track {
+            height: 4px;
+            background: var(--color-divider);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 12px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: var(--color-accent);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        .progress-status {
+            text-align: center;
+            font-size: 0.9rem;
+            color: var(--color-text-sub);
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 900px) {
+            body {
+                overflow: auto;
+            }
+
+            .solver-container {
+                height: auto !important;
+                padding: 20px;
+                display: block;
+            }
+
+            .solver-container.split-view {
+                height: auto !important;
+                gap: 40px;
+            }
+
+            .solver-card {
+                max-width: 100% !important;
+                margin-bottom: 24px;
+            }
+
+            .result-panel {
+                max-width: 100%;
+                display: none;
+            }
+
+            .solver-container.split-view .result-panel {
+                display: flex;
+            }
+
+            .path-list {
+                max-height: 400px;
+            }
+
+            /* Fallback height on mobile */
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Auth View -->
+    <div id="auth-view"
+        style="position:fixed; top:0; left:0; right:0; bottom:0; background:var(--color-bg); z-index:999; display:flex; align-items:center; justify-content:center;">
+        <div class="solver-card" style="max-width: 400px; text-align: center; max-height: unset; overflow: visible;">
+            <div class="solver-title" style="font-size: 1.8rem;">管理員登入</div>
+            <p style="color: var(--color-text-sub); margin-bottom: 24px;">請驗證身份以存取</p>
+            <button id="btn-login" class="btn-solve">Google 登入</button>
+            <div id="auth-msg" style="margin-top: 16px; font-size: 0.9rem; color: var(--color-timer);"></div>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div id="app-view" class="solver-container" style="display: none;">
+
+        <!-- Left: Solver Input -->
+        <div class="solver-card">
+            <button id="btn-logout" class="btn-logout-corner">登出</button>
+
+            <div class="solver-header">
+                <div class="solver-title">高分路徑解題器</div>
+                <div class="solver-subtitle">High Score Path Finder</div>
+            </div>
+
+            <div class="form-grid">
+                <div class="input-wrapper">
+                    <label class="input-label">起點主題 (Start)</label>
+                    <input type="text" id="start-input" class="input-field" placeholder="例如：Python"
+                        value="Python (programming language)">
+                </div>
+                <div class="input-wrapper">
+                    <label class="input-label">終點主題 (Target)</label>
+                    <input type="text" id="target-input" class="input-field" placeholder="例如：Computer" value="Computer">
+                </div>
+            </div>
+
+            <div class="quick-actions">
+                <button class="btn-quick" onclick="window.loadDailyChallenge(0)">載入今日題目</button>
+                <button class="btn-quick" onclick="window.loadDailyChallenge(-1)">載入昨日題目</button>
+                <span id="load-msg"
+                    style="margin-left: auto; font-size: 0.85rem; display: flex; align-items: center;"></span>
+            </div>
+
+            <button id="btn-solve" class="btn-solve" onclick="solverApp.run()">開始解題</button>
+
+            <div id="progress-area" class="progress-wrapper">
+                <div class="progress-track">
+                    <div id="progress-element" class="progress-bar"></div>
+                </div>
+                <div id="status-text" class="progress-status">初始化中...</div>
+            </div>
+        </div>
+
+        <!-- Right: Results Panel -->
+        <div id="result-area" class="result-panel">
+            <div class="result-header">
+                <div class="result-title">搜尋完成</div>
+                <div id="time-taken" style="font-family: monospace; color: var(--color-text-sub);"></div>
+            </div>
+
+            <div id="path-list" class="path-list">
+                <!-- Path Items -->
+            </div>
+
+            <div class="share-block">
+                <button
+                    style="position: absolute; top: 12px; right: 12px; background: rgba(255,255,255,0.1); border:none; color:white; padding: 6px 12px; border-radius: 6px; cursor: pointer;"
+                    onclick="solverApp.copySocial()">複製</button>
+                <div id="social-text"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <script type="module">
+        import authModule, { auth, onAuthStateChanged, db, doc, getDoc } from './js/auth.js';
+        import './js/solver.js';
+
+        const el = (id) => document.getElementById(id);
+
+        // Auth Logic
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                el('auth-msg').textContent = '檢查權限中...';
+                el('btn-login').style.display = 'none';
+                try {
+                    const adminRef = doc(db, 'admins', user.uid);
+                    if ((await getDoc(adminRef)).exists()) {
+                        el('auth-view').style.display = 'none';
+                        el('app-view').style.display = 'flex';
+                    } else {
+                        throw new Error('權限不足');
+                    }
+                } catch (e) {
+                    el('auth-msg').textContent = e.message;
+                    el('btn-login').style.display = 'block';
+                }
+            } else {
+                el('auth-view').style.display = 'flex';
+                el('app-view').style.display = 'none';
+            }
+        });
+
+        el('btn-login').onclick = () => authModule.signInWithGoogle();
+        el('btn-logout').onclick = async () => {
+            await authModule.logout();
+            window.location.reload();
+        };
+
+        // UI Trigger for Split View
+        const originalShowResult = solverApp.showResult;
+        solverApp.showResult = function (result) {
+            document.querySelector('.solver-container').classList.add('split-view');
+            originalShowResult.call(this, result);
+        };
+
+        // Manual Load Logic
+        window.loadDailyChallenge = async function (offset = 0) {
+            const date = new Date();
+            date.setDate(date.getDate() + offset);
+            const dateString = date.toISOString().split('T')[0];
+            const msgEl = el('load-msg');
+
+            msgEl.textContent = '載入中...';
+            msgEl.style.color = 'var(--color-text-sub)';
+
+            try {
+                const snap = await getDoc(doc(db, 'daily_puzzles', dateString));
+                if (snap.exists()) {
+                    const d = snap.data();
+                    el('start-input').value = d.start;
+                    el('target-input').value = d.target;
+                    msgEl.textContent = `已載入 ${offset === 0 ? '今日' : '昨日'}`;
+                    msgEl.style.color = 'var(--color-success)';
+                    setTimeout(() => msgEl.textContent = '', 3000);
+                } else {
+                    msgEl.textContent = '無資料';
+                    msgEl.style.color = 'var(--color-timer)';
+                }
+            } catch (e) {
+                console.error(e);
+                msgEl.textContent = '錯誤';
+            }
+        };
+
+        (function () {
+            if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        })();
+    </script>
+</body>
+
+</html>
