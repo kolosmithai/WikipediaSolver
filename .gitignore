@@ -4,9 +4,9 @@ node_modules/
 dist/
 .env
 
-# Automation Output
-automation/output/
-automation/history.json
+# Automation Output (Removed from gitignore to allow GitHub Hosting)
+# automation/output/
+# automation/history.json
 
 # OS files
 .DS_Store

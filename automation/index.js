@@ -189,6 +189,17 @@ ${triviaContent}
         fs.writeFileSync(path.join(OUTPUT_DIR, 'post_content.txt'), finalOutput);
         console.log('檔案已儲存至 ' + OUTPUT_DIR);
 
+        // --- PHASED EXECUTION ---
+        const args = process.argv.slice(2);
+        const onlyImages = args.includes('--only-images');
+        const onlyPost = args.includes('--only-post');
+
+        if (onlyImages) {
+            console.log('\n[Phase] Only Images mode. Skipping Threads API call.');
+            console.log('✅ Success! Images generated and ready for GitHub hosting.');
+            process.exit(0);
+        }
+
         // --- Threads Scheduling ---
         try {
             // Calculate Schedule Time: Tomorrow 08:00
@@ -197,7 +208,7 @@ ${triviaContent}
             tomorrow.setDate(tomorrow.getDate() + 1);
             tomorrow.setHours(8, 0, 0, 0); // 08:00:00
 
-            // Pass 'app' (Firebase App) which is already initialized in this file
+            // If we are in 'onlyPost' mode (or default), we call the API
             await scheduleThreadsPost(app, imagePaths, finalOutput, tomorrow);
 
         } catch (e) {

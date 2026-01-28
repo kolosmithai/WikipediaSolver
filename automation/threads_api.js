@@ -1,33 +1,31 @@
-
-import { ref, uploadBytes, getDownloadURL, getStorage } from "firebase/storage";
-import { initializeApp } from "firebase/app";
 import fs from 'fs';
 import path from 'path';
 import fetch from 'node-fetch';
 import 'dotenv/config';
 
-// Re-use config or import it. For now, hardcoding based on previous file is safer 
-// but reusing the app instance from index.js would be better if passed in.
-// However, to keep this module standalone, we'll accept 'app' as an argument or init a new one if needed.
-// BE CAREFUL: node-canvas/index.js initiates app too. 
+// 1. GitHub URL Helper (Replaces Firebase Storage)
+export async function getGitHubImageUrl(localPath) {
+    // localPath example: './automation/output/2026-01-28/step_1.png'
+    // We need to convert it to a GitHub Raw URL:
+    // https://raw.githubusercontent.com/kolosmithai/WikipediaSolver/main/automation/automation/output/2026-01-28/step_1.png
 
-// Threads API Config
-const THREADS_USER_ID = process.env.THREADS_USER_ID;
-const THREADS_ACCESS_TOKEN = process.env.THREADS_ACCESS_TOKEN;
+    // Note: The 'automation' folder is nested in the repo as 'automation/'
+    // So the path in the repo is 'automation/output/...' 
+    // BUT looking at the list_dir, the localPath passed from index.js is likely relative.
 
-// 1. Upload Helper
-export async function uploadImageToStorage(firebaseApp, localPath, remotePath) {
-    if (!fs.existsSync(localPath)) throw new Error(`File not found: ${localPath}`);
+    const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/kolosmithai/WikipediaSolver/main';
 
-    const storage = getStorage(firebaseApp);
-    const fileBuffer = fs.readFileSync(localPath);
-    const storageRef = ref(storage, remotePath); // e.g., 'daily_posts/2026-01-28/step_1.png'
+    // Normalize path: remove './' and use forward slashes
+    let normalizedPath = localPath.replace(/\\/g, '/');
+    if (normalizedPath.startsWith('./')) {
+        normalizedPath = normalizedPath.substring(2);
+    }
 
-    console.log(`[Firebase] Uploading ${path.basename(localPath)}...`);
-    const snapshot = await uploadBytes(storageRef, fileBuffer);
-    const publicUrl = await getDownloadURL(snapshot.ref);
+    // In the repo structure, the 'automation' folder is top-level.
+    // If localPath starts with 'automation/output', it's already correct.
+    const publicUrl = `${GITHUB_RAW_BASE}/${normalizedPath}`;
 
-    console.log(`[Firebase] Uploaded! URL: ${publicUrl}`);
+    console.log(`[GitHub Host] Generated URL: ${publicUrl}`);
     return publicUrl;
 }
 
@@ -84,13 +82,12 @@ export async function scheduleThreadsPost(firebaseApp, imagePaths, text, schedul
     for (let i = 0; i < imagePaths.length; i++) {
         const localPath = imagePaths[i];
         const fileName = path.basename(localPath);
-        const remotePath = `daily_posts/${todayStr}/${fileName}`; // Organized path
 
         try {
-            const url = await uploadImageToStorage(firebaseApp, localPath, remotePath);
+            const url = await getGitHubImageUrl(localPath);
             publicUrls.push(url);
         } catch (e) {
-            console.error(`Upload failed for ${fileName}:`, e.message);
+            console.error(`URL generation failed for ${fileName}:`, e.message);
             throw e;
         }
     }
