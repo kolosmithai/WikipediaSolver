@@ -25,6 +25,23 @@ const db = getFirestore(app);
 
 const OUTPUT_DIR_BASE = './output';
 
+/**
+ * 獲取台灣時區的日期字串 (YYYY-MM-DD)
+ * @param {number} offsetDays 相對今日的偏移天數
+ */
+function getTaiwanDateString(offsetDays = 0) {
+    const now = new Date();
+    if (offsetDays !== 0) {
+        now.setDate(now.getDate() + offsetDays);
+    }
+    return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Taipei',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).format(now);
+}
+
 // Helper to ensure directory exists
 function ensureOutputDir(dirPath) {
     if (!fs.existsSync(dirPath)) {
@@ -33,29 +50,42 @@ function ensureOutputDir(dirPath) {
 }
 
 async function getDailyChallenge() {
-    const date = new Date();
     // 根據用戶要求，我們一律解「前一天」的題目以確保安全性
-    date.setDate(date.getDate() - 1);
-
-    const dateString = date.toLocaleDateString('en-CA');
+    const dateString = getTaiwanDateString(-1);
 
     console.log(`正在查詢前一日題目 (${dateString})...`);
     try {
         const docRef = doc(db, 'daily_puzzles', dateString);
         const snap = await getDoc(docRef);
 
-
         if (snap.exists()) {
             const data = snap.data();
-            console.log(`獲取成功！\n今日目標：${data.start} → ${data.target}`);
+            console.log(`獲取成功！\n目標題目：${data.start} → ${data.target}`);
             return { start: data.start, target: data.target };
         } else {
-            console.error('找不到今日或昨日的題目。使用預設值。');
+            console.error(`找不到題目 (${dateString})。`);
             return null;
         }
     } catch (e) {
         console.error('Firebase 連線錯誤:', e.message);
         return null;
+    }
+}
+
+async function runPosting(data, args) {
+    try {
+        console.log(`已載入解題結果：${data.path.join(' → ')}`);
+
+        const now = new Date();
+        const tomorrow08 = new Date(now);
+        tomorrow08.setDate(tomorrow08.getDate() + 1);
+        tomorrow08.setHours(8, 0, 0, 0);
+
+        const postTime = args.includes('--now') ? null : tomorrow08;
+        await scheduleThreadsPost(app, data.imagePaths, data.postContent, postTime);
+        console.log('✅ 發文指令已發送完成！');
+    } catch (e) {
+        console.error('發文程序終止。');
     }
 }
 
@@ -66,32 +96,16 @@ async function main() {
     // Special Case: Only Post (Read from existing metadata)
     if (onlyPost) {
         console.log('\n[Phase] Only Post mode. Loading metadata...');
-        const todayStr = new Date().toLocaleDateString('en-CA');
+        const todayStr = getTaiwanDateString(0);
         const metaPath = path.join(OUTPUT_DIR_BASE, todayStr, 'metadata.json');
 
         if (!fs.existsSync(metaPath)) {
-            console.error('找不到 metadata.json，無法單獨執行發文方案。');
+            console.error(`找不到日期為 ${todayStr} 的 metadata.json。`);
             process.exit(1);
         }
 
         const data = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
-        console.log(`已載入解題結果：${data.path.join(' → ')}`);
-
-        try {
-            const now = new Date();
-            const tomorrow08 = new Date(now);
-            tomorrow08.setDate(tomorrow08.getDate() + 1);
-            tomorrow08.setHours(8, 0, 0, 0);
-
-            // Support --now for immediate posting
-            const postTime = args.includes('--now') ? null : tomorrow08;
-
-            await scheduleThreadsPost(app, data.imagePaths, data.postContent, postTime);
-            console.log('✅ 發文指令已發送完成！');
-        } catch (e) {
-            // Error already logged in threads_api.js, so we just log the summary here
-            console.error('發文程序終止。');
-        }
+        await runPosting(data, args);
         process.exit(0);
     }
 
@@ -119,8 +133,8 @@ async function main() {
         console.log(`使用手動輸入：${start} → ${target}`);
     }
 
-    // --- Dynamic Output Directory ---
-    const todayStr = new Date().toLocaleDateString('en-CA');
+    // --- Dynamic Output Directory (Based on Taiwan Today) ---
+    const todayStr = getTaiwanDateString(0);
     const OUTPUT_DIR = path.join(OUTPUT_DIR_BASE, todayStr);
 
     try {
@@ -241,19 +255,7 @@ ${triviaContent}
         }
 
         // --- Threads Scheduling ---
-        try {
-            // Calculate Schedule Time: Tomorrow 08:00
-            const now = new Date();
-            const tomorrow08 = new Date(now);
-            tomorrow08.setDate(tomorrow08.getDate() + 1);
-            tomorrow08.setHours(8, 0, 0, 0);
-
-            const postTime = args.includes('--now') ? null : tomorrow08;
-            await scheduleThreadsPost(app, imagePaths, finalOutput, postTime);
-
-        } catch (e) {
-            console.error('\n⚠️ Threads 發文程序失敗。');
-        }
+        await runPosting(metadata, args);
 
         // Success exit
         process.exit(0);
