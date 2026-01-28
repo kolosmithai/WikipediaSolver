@@ -2,8 +2,8 @@ name: Daily Wikipedia Post
 
 on:
   schedule:
-    # 每天台灣時間 01:00 (UTC 17:00) 執行
-    - cron: '0 17 * * *'
+    # 每天台灣時間 00:30 (UTC 16:30) 執行
+    - cron: '30 16 * * *'
   workflow_dispatch: # 允許手動觸發測試
 
 jobs:
