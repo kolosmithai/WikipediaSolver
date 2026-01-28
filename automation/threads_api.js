@@ -44,16 +44,14 @@ async function createItemContainer(imageUrl) {
     const url = `${API_BASE}/${THREADS_USER_ID}/threads?media_type=IMAGE&image_url=${encodeURIComponent(imageUrl)}&is_carousel_item=true&access_token=${THREADS_ACCESS_TOKEN}`;
     const res = await fetch(url, { method: 'POST' });
     const data = await res.json();
-    if (data.error) throw new Error(`Create Item Error: ${data.error.message}`);
+    if (data.error) {
+        console.error('Create Item Full Error:', JSON.stringify(data.error, null, 2));
+        throw new Error(`Create Item Error: ${data.error.message}`);
+    }
     return data.id;
 }
 
 async function createCarouselContainer(text, itemIds, scheduleTime) {
-    // scheduleTime is Unix Timestamp (seconds)
-    // If scheduleTime is provided, we set scheduled_publish_time and published=true (Wait, usually 'published=true' is for immediate?)
-    // Actually for Threads, simply calling 'threads_publish' usually publishes it.
-    // Documentation says to use 'scheduled_publish_time' on the CONTAINER creation.
-
     let url = `${API_BASE}/${THREADS_USER_ID}/threads?media_type=CAROUSEL&children=${itemIds.join(',')}&text=${encodeURIComponent(text)}&access_token=${THREADS_ACCESS_TOKEN}`;
 
     if (scheduleTime) {
@@ -62,7 +60,10 @@ async function createCarouselContainer(text, itemIds, scheduleTime) {
 
     const res = await fetch(url, { method: 'POST' });
     const data = await res.json();
-    if (data.error) throw new Error(`Create Carousel Error: ${data.error.message}`);
+    if (data.error) {
+        console.error('Create Carousel Full Error:', JSON.stringify(data.error, null, 2));
+        throw new Error(`Create Carousel Error: ${data.error.message}`);
+    }
     return data.id;
 }
 
@@ -70,7 +71,10 @@ async function publishContainer(containerId) {
     const url = `${API_BASE}/${THREADS_USER_ID}/threads_publish?creation_id=${containerId}&access_token=${THREADS_ACCESS_TOKEN}`;
     const res = await fetch(url, { method: 'POST' });
     const data = await res.json();
-    if (data.error) throw new Error(`Publish Error: ${data.error.message}`);
+    if (data.error) {
+        console.error('Publish Full Error:', JSON.stringify(data.error, null, 2));
+        throw new Error(`Publish Error: ${data.error.message}`);
+    }
     return data.id;
 }
 
