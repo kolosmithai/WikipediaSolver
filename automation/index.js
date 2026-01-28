@@ -34,20 +34,16 @@ function ensureOutputDir(dirPath) {
 
 async function getDailyChallenge() {
     const date = new Date();
-    // Use local date string (YYYY-MM-DD)
+    // 根據用戶要求，我們一律解「前一天」的題目以確保安全性
+    date.setDate(date.getDate() - 1);
+
     const dateString = date.toLocaleDateString('en-CA');
 
-    console.log(`正在查詢今日題目 (${dateString})...`);
+    console.log(`正在查詢前一日題目 (${dateString})...`);
     try {
         const docRef = doc(db, 'daily_puzzles', dateString);
-        let snap = await getDoc(docRef);
+        const snap = await getDoc(docRef);
 
-        if (!snap.exists()) {
-            console.log('今日無題目，嘗試查詢昨日...');
-            date.setDate(date.getDate() - 1);
-            const yString = date.toLocaleDateString('en-CA');
-            snap = await getDoc(doc(db, 'daily_puzzles', yString));
-        }
 
         if (snap.exists()) {
             const data = snap.data();
