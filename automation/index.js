@@ -208,8 +208,9 @@ async function main() {
         }
 
         // 4. Final Output Construction
+        const challengeDateStr = getTaiwanDateString(-1).replace(/-/g, '/');
         const finalOutput = `
-維基百科每日路徑挑戰
+繁體中文維基百科接龍每日挑戰 ${challengeDateStr}
 
 起點：${result.path[0]}
 終點：${result.path[result.path.length - 1]}
@@ -222,7 +223,7 @@ ${result.path.join(' → ')}
 ${triviaContent}
 
  
- #WikiGame #每日挑戰 #冷知識
+ WikiGame 每日挑戰 冷知識
 `;
 
         console.log('\n==========================================');
