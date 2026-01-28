@@ -112,14 +112,12 @@ export async function scheduleThreadsPost(firebaseApp, imagePaths, text, schedul
         const result = await createItemContainer(url);
         itemIds.push(result.id);
         console.log(`[Threads] Item Container Created: ${result.id}`);
-        // Small delay between items to be polite to API
-        await sleep(2000);
     }
 
-    // --- CRITICAL DELAY ---
-    // Meta/Threads needs time to crawl the images from GitHub before they can be used in a Carousel.
-    console.log(`[Threads] Waiting 10 seconds for Meta to process images...`);
-    await sleep(10000);
+    // Wait for item containers to be ready (Meta needs to download images)
+    for (const id of itemIds) {
+        await waitForContainer(id);
+    }
 
     // C. Create Main Carousel Container
     let timestamp = null;
@@ -133,6 +131,9 @@ export async function scheduleThreadsPost(firebaseApp, imagePaths, text, schedul
     const carouselResult = await createCarouselContainer(text, itemIds, timestamp);
     const containerId = carouselResult.id;
     console.log(`[Threads] Carousel Container Created: ${containerId}`);
+
+    // Wait for the carousel itself to be ready
+    await waitForContainer(containerId);
 
     // D. Publish
     // Important: For scheduled posts, call publishContainer to "confirm" the schedule
