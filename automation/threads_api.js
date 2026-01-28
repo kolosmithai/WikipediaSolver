@@ -22,8 +22,12 @@ export async function getGitHubImageUrl(localPath) {
     }
 
     // In the repo structure, the 'automation' folder is top-level.
-    // If localPath starts with 'automation/output', it's already correct.
-    const publicUrl = `${GITHUB_RAW_BASE}/${normalizedPath}`;
+    // If localPath is './output/xxx', we want automation/output/xxx
+    let finalPathInRepo = normalizedPath;
+    if (!finalPathInRepo.includes('automation/')) {
+        finalPathInRepo = 'automation/' + finalPathInRepo;
+    }
+    const publicUrl = `${GITHUB_RAW_BASE}/${finalPathInRepo}`;
 
     console.log(`[GitHub Host] Generated URL: ${publicUrl}`);
     return publicUrl;

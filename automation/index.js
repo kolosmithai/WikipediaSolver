@@ -23,7 +23,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-const OUTPUT_DIR_BASE = './automation/output';
+const OUTPUT_DIR_BASE = './output';
 
 // Helper to ensure directory exists
 function ensureOutputDir(dirPath) {
