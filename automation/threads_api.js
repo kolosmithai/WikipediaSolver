@@ -87,6 +87,9 @@ async function publishContainer(containerId) {
     });
 }
 
+// Helper for delay
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 // 3. Main Workflow
 export async function scheduleThreadsPost(firebaseApp, imagePaths, text, scheduleDate) {
     if (!THREADS_USER_ID || !THREADS_ACCESS_TOKEN) {
@@ -109,7 +112,14 @@ export async function scheduleThreadsPost(firebaseApp, imagePaths, text, schedul
         const result = await createItemContainer(url);
         itemIds.push(result.id);
         console.log(`[Threads] Item Container Created: ${result.id}`);
+        // Small delay between items to be polite to API
+        await sleep(2000);
     }
+
+    // --- CRITICAL DELAY ---
+    // Meta/Threads needs time to crawl the images from GitHub before they can be used in a Carousel.
+    console.log(`[Threads] Waiting 10 seconds for Meta to process images...`);
+    await sleep(10000);
 
     // C. Create Main Carousel Container
     let timestamp = null;
