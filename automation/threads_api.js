@@ -40,23 +40,41 @@ export async function getGitHubImageUrl(localPath) {
 // 2. Threads API Helpers
 const API_BASE = 'https://graph.threads.net/v1.0';
 
-async function fetchMeta(path, params = {}) {
-    // Add access_token to params
+async function fetchMeta(path, params = {}, method = 'POST') {
     const searchParams = new URLSearchParams({
         ...params,
         access_token: THREADS_ACCESS_TOKEN
     });
 
-    const url = `${API_BASE}/${path}?${searchParams.toString()}`;
-    const res = await fetch(url, { method: 'POST' });
+    let url = `${API_BASE}/${path}?${searchParams.toString()}`;
+    const res = await fetch(url, { method });
     const data = await res.json();
 
     if (data.error) {
-        console.error(`[API Error] Path: ${path}`);
+        console.error(`[API Error] Path: ${path} (${method})`);
         console.error(JSON.stringify(data.error, null, 2));
         throw new Error(data.error.message);
     }
     return data;
+}
+
+async function waitForContainer(containerId) {
+    console.log(`[Threads] Waiting for container ${containerId} to finish processing...`);
+    const maxRetries = 12; // Wait up to 60s
+    for (let i = 0; i < maxRetries; i++) {
+        // Status check requires GET
+        const data = await fetchMeta(containerId, { fields: 'status,error_message' }, 'GET');
+        console.log(`[Threads] Status check (${i + 1}/${maxRetries}): ${data.status}`);
+
+        if (data.status === 'FINISHED') return true;
+        if (data.status === 'ERROR') {
+            throw new Error(`Meta Processing Failed: ${data.error_message}`);
+        }
+
+        // Wait 5 seconds before next check
+        await new Promise(r => setTimeout(r, 5000));
+    }
+    throw new Error('Wait for container timed out (60s).');
 }
 
 async function createItemContainer(imageUrl) {
