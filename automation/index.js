@@ -87,10 +87,14 @@ async function main() {
             tomorrow08.setDate(tomorrow08.getDate() + 1);
             tomorrow08.setHours(8, 0, 0, 0);
 
-            await scheduleThreadsPost(app, data.imagePaths, data.postContent, tomorrow08);
+            // Support --now for immediate posting
+            const postTime = args.includes('--now') ? null : tomorrow08;
+
+            await scheduleThreadsPost(app, data.imagePaths, data.postContent, postTime);
             console.log('✅ 發文指令已發送完成！');
         } catch (e) {
-            console.error('發文失敗:', e.message);
+            // Error already logged in threads_api.js, so we just log the summary here
+            console.error('發文程序終止。');
         }
         process.exit(0);
     }
@@ -248,11 +252,11 @@ ${triviaContent}
             tomorrow08.setDate(tomorrow08.getDate() + 1);
             tomorrow08.setHours(8, 0, 0, 0);
 
-            await scheduleThreadsPost(app, imagePaths, finalOutput, tomorrow08);
+            const postTime = args.includes('--now') ? null : tomorrow08;
+            await scheduleThreadsPost(app, imagePaths, finalOutput, postTime);
 
         } catch (e) {
-            console.error('\n⚠️ Threads Scheduling Failed:', e.message);
-            console.log('請檢查 .env 是否設定 THREADS_USER_ID 與 THREADS_ACCESS_TOKEN');
+            console.error('\n⚠️ Threads 發文程序失敗。');
         }
 
         // Success exit

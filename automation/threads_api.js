@@ -40,42 +40,51 @@ export async function getGitHubImageUrl(localPath) {
 // 2. Threads API Helpers
 const API_BASE = 'https://graph.threads.net/v1.0';
 
-async function createItemContainer(imageUrl) {
-    const url = `${API_BASE}/${THREADS_USER_ID}/threads?media_type=IMAGE&image_url=${encodeURIComponent(imageUrl)}&is_carousel_item=true&access_token=${THREADS_ACCESS_TOKEN}`;
+async function fetchMeta(path, params = {}) {
+    // Add access_token to params
+    const searchParams = new URLSearchParams({
+        ...params,
+        access_token: THREADS_ACCESS_TOKEN
+    });
+
+    const url = `${API_BASE}/${path}?${searchParams.toString()}`;
     const res = await fetch(url, { method: 'POST' });
     const data = await res.json();
+
     if (data.error) {
-        console.error('Create Item Full Error:', JSON.stringify(data.error, null, 2));
-        throw new Error(`Create Item Error: ${data.error.message}`);
+        console.error(`[API Error] Path: ${path}`);
+        console.error(JSON.stringify(data.error, null, 2));
+        throw new Error(data.error.message);
     }
-    return data.id;
+    return data;
+}
+
+async function createItemContainer(imageUrl) {
+    return fetchMeta(`${THREADS_USER_ID}/threads`, {
+        media_type: 'IMAGE',
+        image_url: imageUrl,
+        is_carousel_item: 'true'
+    });
 }
 
 async function createCarouselContainer(text, itemIds, scheduleTime) {
-    let url = `${API_BASE}/${THREADS_USER_ID}/threads?media_type=CAROUSEL&children=${itemIds.join(',')}&text=${encodeURIComponent(text)}&access_token=${THREADS_ACCESS_TOKEN}`;
+    const params = {
+        media_type: 'CAROUSEL',
+        children: itemIds.join(','),
+        text: text
+    };
 
     if (scheduleTime) {
-        url += `&scheduled_publish_time=${scheduleTime}`;
+        params.scheduled_publish_time = scheduleTime;
     }
 
-    const res = await fetch(url, { method: 'POST' });
-    const data = await res.json();
-    if (data.error) {
-        console.error('Create Carousel Full Error:', JSON.stringify(data.error, null, 2));
-        throw new Error(`Create Carousel Error: ${data.error.message}`);
-    }
-    return data.id;
+    return fetchMeta(`${THREADS_USER_ID}/threads`, params);
 }
 
 async function publishContainer(containerId) {
-    const url = `${API_BASE}/${THREADS_USER_ID}/threads_publish?creation_id=${containerId}&access_token=${THREADS_ACCESS_TOKEN}`;
-    const res = await fetch(url, { method: 'POST' });
-    const data = await res.json();
-    if (data.error) {
-        console.error('Publish Full Error:', JSON.stringify(data.error, null, 2));
-        throw new Error(`Publish Error: ${data.error.message}`);
-    }
-    return data.id;
+    return fetchMeta(`${THREADS_USER_ID}/threads_publish`, {
+        creation_id: containerId
+    });
 }
 
 // 3. Main Workflow
@@ -87,40 +96,42 @@ export async function scheduleThreadsPost(firebaseApp, imagePaths, text, schedul
 
     console.log('\n🧵 Starting Threads Scheduling...');
 
-    // A. Upload All Images
+    // A. Generate All Public URLs
     const publicUrls = [];
-    const todayStr = new Date().toLocaleDateString('en-CA');
-
     for (let i = 0; i < imagePaths.length; i++) {
-        const localPath = imagePaths[i];
-        const fileName = path.basename(localPath);
-
-        try {
-            const url = await getGitHubImageUrl(localPath);
-            publicUrls.push(url);
-        } catch (e) {
-            console.error(`URL generation failed for ${fileName}:`, e.message);
-            throw e;
-        }
+        const url = await getGitHubImageUrl(imagePaths[i]);
+        publicUrls.push(url);
     }
 
     // B. Create Item Containers
     const itemIds = [];
     for (const url of publicUrls) {
-        const id = await createItemContainer(url);
-        itemIds.push(id);
-        // Rate limit logging/pause?
+        const result = await createItemContainer(url);
+        itemIds.push(result.id);
+        console.log(`[Threads] Item Container Created: ${result.id}`);
     }
 
-    // C. Create Main Carousel Container with Schedule
-    // Calculate timestamp
-    const timestamp = Math.floor(scheduleDate.getTime() / 1000);
-    console.log(`[Threads] Scheduling for ${scheduleDate.toISOString()} (TS: ${timestamp})`);
+    // C. Create Main Carousel Container
+    let timestamp = null;
+    if (scheduleDate) {
+        timestamp = Math.floor(scheduleDate.getTime() / 1000);
+        console.log(`[Threads] Scheduling for ${scheduleDate.toISOString()} (TS: ${timestamp})`);
+    } else {
+        console.log(`[Threads] Posting IMMEDIATELY...`);
+    }
 
-    const containerId = await createCarouselContainer(text, itemIds, timestamp);
+    const carouselResult = await createCarouselContainer(text, itemIds, timestamp);
+    const containerId = carouselResult.id;
     console.log(`[Threads] Carousel Container Created: ${containerId}`);
 
-    // D. Publish (This confirms the schedule)
+    // D. Publish
+    // Important: For scheduled posts, call publishContainer to "confirm" the schedule
+    // For immediate posts, call publishContainer to "go live"
     await publishContainer(containerId);
-    console.log(`[Threads] ✅ Successfully Scheduled!`);
+
+    if (timestamp) {
+        console.log(`[Threads] ✅ Successfully Scheduled!`);
+    } else {
+        console.log(`[Threads] ✅ Successfully Published!`);
+    }
 }
